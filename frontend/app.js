@@ -271,7 +271,7 @@ async function loadHistory() {
         <td>${order.cantidad}</td>
         <td>$${parseFloat(order.precio_uni).toFixed(2)}</td>
         <td style="font-weight: 600; color: var(--accent);">$${parseFloat(order.total).toFixed(2)}</td>
-        <td style="font-weight: 500; color: #a0aec0;">${order.vendedor}</td>
+        <td style="font-weight: 500; color: #cbd5e1;">${order.vendedor}</td>
         <td style="text-align: center;">
           <button class="btn-action btn-edit" onclick="startEditOrder(${order.id})">✏️ Editar</button>
         </td>
@@ -282,6 +282,79 @@ async function loadHistory() {
     console.error(err);
   }
 }
+
+// ==================== LÓGICA DE PEDIDOS MULTI-ITEM (CARRITO) ====================
+let stagedItems = [];
+
+const addItemBtn = document.getElementById('addItemBtn');
+const stagedItemsBody = document.getElementById('stagedItemsBody');
+const stagedItemsContainer = document.getElementById('staged-items-container');
+
+if (addItemBtn) {
+  addItemBtn.onclick = () => {
+    const product = document.getElementById('order-product').value;
+    const qtyInput = document.getElementById('order-qty');
+    const priceInput = document.getElementById('order-price');
+    const qty = parseInt(qtyInput.value);
+    const price = parseFloat(priceInput.value);
+
+    if (!product || isNaN(qty) || qty <= 0 || isNaN(price) || price <= 0) {
+      alert('Por favor, selecciona un producto e ingresa una cantidad y precio unitario válidos.');
+      return;
+    }
+
+    // Verificar si el producto ya está en el carrito temporal
+    const existing = stagedItems.find(item => item.producto === product);
+    if (existing) {
+      existing.cantidad += qty;
+      existing.precio_uni = price; // Actualizar con el último precio
+    } else {
+      stagedItems.push({
+        producto: product,
+        cantidad: qty,
+        precio_uni: price
+      });
+    }
+
+    // Limpiar inputs del item individual
+    qtyInput.value = '';
+    priceInput.value = '';
+
+    renderStagedItems();
+  };
+}
+
+function renderStagedItems() {
+  if (!stagedItemsBody || !stagedItemsContainer) return;
+
+  stagedItemsBody.innerHTML = '';
+  
+  if (stagedItems.length === 0) {
+    stagedItemsContainer.classList.add('hidden');
+    return;
+  }
+
+  stagedItemsContainer.classList.remove('hidden');
+  stagedItems.forEach((item, index) => {
+    const total = item.cantidad * item.precio_uni;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${getProductBadgeHTML(item.producto)}</td>
+      <td>${item.cantidad}</td>
+      <td>$${item.precio_uni.toFixed(2)}</td>
+      <td style="font-weight: 600; color: var(--accent);">$${total.toFixed(2)}</td>
+      <td style="text-align: center;">
+        <button type="button" class="btn-action btn-disable" onclick="removeStagedItem(${index})" style="padding: 0.25rem 0.5rem;" title="Eliminar del Pedido">🗑️</button>
+      </td>
+    `;
+    stagedItemsBody.appendChild(tr);
+  });
+}
+
+window.removeStagedItem = (index) => {
+  stagedItems.splice(index, 1);
+  renderStagedItems();
+};
 
 // --- Flujo de Edición de Pedidos ---
 let editOrderId = null;
@@ -298,13 +371,15 @@ window.startEditOrder = (id) => {
   submitOrderBtn.textContent = 'Guardar Cambios';
   cancelEditBtn.classList.remove('hidden');
 
+  // En modo edición individual, ocultamos el carrito temporal y cargamos los valores en los inputs principales
+  stagedItems = [];
+  renderStagedItems();
+
   // Llenar formulario
   document.getElementById('order-date').value = order.fecha;
   document.getElementById('order-product').value = order.producto;
   
   const customZoneInput = document.getElementById('order-zone-custom');
-  
-  // Si la zona no es de las predefinidas
   const predfZones = ["Quito Norte", "Quito Sur", "Cumbayá", "Tumbaco", "Calderón"];
   if (predfZones.includes(order.zona)) {
     orderZoneSelect.value = order.zona;
@@ -331,6 +406,8 @@ function resetOrderForm() {
   cancelEditBtn.classList.add('hidden');
   customZoneGroup.classList.add('hidden');
   document.getElementById('order-zone-custom').required = false;
+  stagedItems = [];
+  renderStagedItems();
   orderForm.reset();
   if (dateInput) dateInput.value = today;
 }
@@ -352,19 +429,39 @@ if (orderForm) {
     orderMsg.textContent = editOrderId ? 'Guardando cambios...' : 'Guardando pedido...';
     orderMsg.style.color = '#fff';
 
-    // Manejar zona dinámica
+    // Determinar zona
     let finalZone = orderZoneSelect.value;
     if (finalZone === 'Otros') {
       finalZone = document.getElementById('order-zone-custom').value;
+      if (!finalZone.trim()) {
+        alert('Por favor especifica la zona personalizada.');
+        return;
+      }
     }
 
-    const orderData = {
-      fecha: document.getElementById('order-date').value,
-      producto: document.getElementById('order-product').value,
-      zona: finalZone,
-      cantidad: parseInt(document.getElementById('order-qty').value),
-      precio_uni: parseFloat(document.getElementById('order-price').value)
-    };
+    let payload = {};
+    if (editOrderId) {
+      // Edición individual clásica
+      payload = {
+        fecha: document.getElementById('order-date').value,
+        producto: document.getElementById('order-product').value,
+        zona: finalZone,
+        cantidad: parseInt(document.getElementById('order-qty').value),
+        precio_uni: parseFloat(document.getElementById('order-price').value)
+      };
+    } else {
+      // Inserción en lote (Multi-Item)
+      if (stagedItems.length === 0) {
+        alert('Por favor, agrega al menos un producto a la lista usando el botón "Agregar Item al Pedido" antes de guardar.');
+        orderMsg.textContent = '';
+        return;
+      }
+      payload = {
+        fecha: document.getElementById('order-date').value,
+        zona: finalZone,
+        items: stagedItems
+      };
+    }
 
     const url = editOrderId ? `${api}/orders/${editOrderId}` : `${api}/orders`;
     const method = editOrderId ? 'PUT' : 'POST';
@@ -373,12 +470,12 @@ if (orderForm) {
       const resp = await fetchWithAuth(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderData)
+        body: JSON.stringify(payload)
       });
       const data = await resp.json();
 
       if (resp.ok) {
-        orderMsg.textContent = editOrderId ? '¡Pedido corregido con éxito!' : `¡Pedido guardado! Total: $${data.total}`;
+        orderMsg.textContent = editOrderId ? '¡Pedido corregido con éxito!' : `¡Pedido de lote guardado! Total: $${data.total}`;
         orderMsg.style.color = 'var(--accent)';
         resetOrderForm();
         loadHistory();
@@ -415,7 +512,6 @@ async function loadUsersList() {
     if (!resp.ok) throw new Error('Error al cargar usuarios');
     const users = await resp.json();
 
-    // Actualizar KPI de usuarios activos en el dashboard
     const activeUsersCount = users.filter(u => u.status === 'active').length;
     const kpiUsers = document.getElementById('kpi-users-count');
     if (kpiUsers) kpiUsers.textContent = activeUsersCount;
@@ -604,7 +700,6 @@ async function loadLoginLogs() {
 let allOrdersData = [];
 let chartInstances = {};
 
-// Selectores de Filtros
 const filterYear = document.getElementById('filter-year');
 const filterMonth = document.getElementById('filter-month');
 const filterZone = document.getElementById('filter-zone');
@@ -617,10 +712,7 @@ async function loadDashboardData() {
     if (!resp.ok) throw new Error('Error cargando datos de dashboard');
     allOrdersData = await resp.json();
 
-    // Inicializar los filtros dropdowns
     populateFilterDropdowns();
-    
-    // Calcular métricas generales y dibujar gráficos
     updateDashboard();
   } catch (e) {
     console.error(e);
@@ -628,13 +720,11 @@ async function loadDashboardData() {
 }
 
 function populateFilterDropdowns() {
-  // Almacenar valores actuales para no perderlos si cambian dinámicamente
   const currYear = filterYear.value;
   const currMonth = filterMonth.value;
   const currZone = filterZone.value;
   const currProduct = filterProduct.value;
 
-  // Extraer valores únicos
   const years = new Set();
   const months = new Set();
   const zones = new Set();
@@ -649,7 +739,6 @@ function populateFilterDropdowns() {
     if (o.producto) products.add(o.producto);
   });
 
-  // Rellenar selectores
   fillSelect(filterYear, Array.from(years).sort().reverse(), currYear);
   fillSelect(filterMonth, Array.from(months).sort(), currMonth);
   fillSelect(filterZone, Array.from(zones).sort(), currZone);
@@ -667,7 +756,6 @@ function fillSelect(element, list, currentValue) {
   });
 }
 
-// Event Listeners de Filtros
 [filterYear, filterMonth, filterZone, filterProduct].forEach(el => {
   if (el) {
     el.onchange = () => {
@@ -686,14 +774,12 @@ if (resetFiltersBtn) {
   };
 }
 
-// Función Principal de Procesamiento y Filtrado
 function updateDashboard() {
   const yearVal = filterYear.value;
   const monthVal = filterMonth.value;
   const zoneVal = filterZone.value;
   const productVal = filterProduct.value;
 
-  // 1. Filtrar lista de pedidos
   const filtered = allOrdersData.filter(o => {
     if (yearVal && o.fecha.split('-')[0] !== yearVal) return false;
     if (monthVal && o.fecha.split('-')[1] !== monthVal) return false;
@@ -706,7 +792,6 @@ function updateDashboard() {
   const chartsWrapper = document.getElementById('charts-wrapper');
   const conclusionsList = document.getElementById('conclusions-list');
 
-  // Si no hay datos, mostrar banner y vaciar métricas
   if (filtered.length === 0) {
     noDataMsg.classList.remove('hidden');
     chartsWrapper.classList.add('hidden');
@@ -718,7 +803,6 @@ function updateDashboard() {
   noDataMsg.classList.add('hidden');
   chartsWrapper.classList.remove('hidden');
 
-  // 2. Procesar KPIs Rápidos
   let totalSales = 0;
   let totalOrders = filtered.length;
   const uniqueProducts = new Set();
@@ -732,8 +816,7 @@ function updateDashboard() {
   document.getElementById('kpi-orders-count').textContent = totalOrders;
   document.getElementById('kpi-products-count').textContent = uniqueProducts.size;
 
-  // 3. Procesar Tarjetas Especiales
-  // A. Producto Estrella (Por cantidad)
+  // A. Producto Estrella
   const productQtyMap = {};
   filtered.forEach(o => {
     productQtyMap[o.producto] = (productQtyMap[o.producto] || 0) + o.cantidad;
@@ -782,12 +865,12 @@ function updateDashboard() {
     }
   });
   document.getElementById('kpi-top-seller').textContent = topSeller;
-  document.getElementById('kpi-top-seller-orders').textContent = `${topSellerCount} registros de venta`;
+  document.getElementById('kpi-top-seller-orders').textContent = `${topSellerCount} registros`;
 
   // D. Crecimiento Mensual
   const salesByMonthMap = {};
   allOrdersData.forEach(o => {
-    const m = o.fecha.slice(0, 7); // YYYY-MM
+    const m = o.fecha.slice(0, 7);
     salesByMonthMap[m] = (salesByMonthMap[m] || 0) + o.total;
   });
   const sortedMonths = Object.keys(salesByMonthMap).sort();
@@ -807,10 +890,7 @@ function updateDashboard() {
   document.getElementById('kpi-trend-growth').textContent = trendText;
   document.getElementById('kpi-trend-compare').textContent = trendCompare;
 
-  // 4. Renderizar Gráficos de Chart.js
   renderFilteredCharts(filtered);
-
-  // 5. Autogenerar Conclusiones
   generateAutomaticConclusions(starProduct, starPercentage, topZone, topZoneCount, topSeller, topSellerCount, totalSales, totalOrders);
 }
 
@@ -838,9 +918,7 @@ function generateAutomaticConclusions(starProd, starPct, topZ, topZCount, topSel
   `;
 }
 
-// Renderizado de Gráficos Filtrados
 function renderFilteredCharts(data) {
-  // A. Agrupación por producto (Barras)
   const productMap = {};
   data.forEach(o => {
     productMap[o.producto] = (productMap[o.producto] || 0) + parseFloat(o.total);
@@ -874,10 +952,9 @@ function renderFilteredCharts(data) {
     }
   });
 
-  // B. Agrupación por mes (Línea)
   const monthMap = {};
   data.forEach(o => {
-    const m = o.fecha.slice(0, 7); // YYYY-MM
+    const m = o.fecha.slice(0, 7);
     monthMap[m] = (monthMap[m] || 0) + parseFloat(o.total);
   });
   const sortedMonths = Object.keys(monthMap).sort();
@@ -912,10 +989,9 @@ function renderFilteredCharts(data) {
     }
   });
 
-  // C. Agrupación por zona (Barras horizontales)
   const zoneMap = {};
   data.forEach(o => {
-    zoneMap[o.zona] = (zoneMap[o.zona] || 0) + 1; // cantidad de pedidos
+    zoneMap[o.zona] = (zoneMap[o.zona] || 0) + 1;
   });
   const sortedZones = Object.keys(zoneMap).sort((a,b) => zoneMap[b] - zoneMap[a]);
   const sortedZoneVals = sortedZones.map(k => zoneMap[k]);
@@ -940,7 +1016,7 @@ function renderFilteredCharts(data) {
       }]
     },
     options: {
-      indexAxis: 'y', // Convertir en barras horizontales
+      indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
@@ -955,7 +1031,6 @@ function renderFilteredCharts(data) {
   });
 }
 
-// Lógica de Pestañas de Gráficos
 const chartTabButtons = document.querySelectorAll('.chart-tab-btn');
 const chartTabContents = document.querySelectorAll('.chart-tab-content');
 
@@ -981,7 +1056,6 @@ const exportPdfBtn = document.getElementById('exportPdfBtn');
 
 if (exportCsvBtn) {
   exportCsvBtn.onclick = () => {
-    // Generar archivo CSV de los pedidos filtrados actualmente
     const yearVal = filterYear.value;
     const monthVal = filterMonth.value;
     const zoneVal = filterZone.value;
@@ -1000,8 +1074,7 @@ if (exportCsvBtn) {
       return;
     }
 
-    // Cabeceras del CSV
-    let csvContent = '\uFEFF'; // Añadir BOM para caracteres especiales (tildes, etc) en Excel
+    let csvContent = '\uFEFF';
     csvContent += 'Fecha,Producto,Zona de Distribucion,Cantidad,Precio Unitario ($),Total ($),Vendedor\r\n';
 
     filtered.forEach(o => {
@@ -1017,7 +1090,6 @@ if (exportCsvBtn) {
       csvContent += row + '\r\n';
     });
 
-    // Crear el archivo descargable
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1031,7 +1103,6 @@ if (exportCsvBtn) {
 
 if (exportPdfBtn) {
   exportPdfBtn.onclick = () => {
-    // Abrir la ventana de impresión nativa (usa las reglas CSS @media print para limpiar la maqueta)
     window.print();
   };
 }

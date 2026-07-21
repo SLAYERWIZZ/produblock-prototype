@@ -92,19 +92,6 @@
           </div>
           
           <div class="form-group">
-            <label>Producto</label>
-            <select id="order-product" required>
-              <option value="Bloque A">Bloque A</option>
-              <option value="Bloque B">Bloque B</option>
-              <option value="Bloque C">Bloque C</option>
-              <option value="Adoquín">Adoquín</option>
-              <option value="Bordillo">Bordillo</option>
-            </select>
-          </div>
-        </div>
-        
-        <div class="form-grid">
-          <div class="form-group">
             <label>Zona de Distribución</label>
             <select id="order-zone" required>
               <option value="Quito Norte">Quito Norte</option>
@@ -115,22 +102,62 @@
               <option value="Otros">Otros (Especificar abajo)...</option>
             </select>
           </div>
-          
-          <!-- Campo de zona personalizada (Otros) -->
-          <div class="form-group hidden" id="custom-zone-group">
-            <label>Especificar Zona</label>
-            <input type="text" id="order-zone-custom" placeholder="Escribe el nombre de la zona" />
-          </div>
-          
-          <div class="form-group">
-            <label>Cantidad</label>
-            <input type="number" id="order-qty" min="1" placeholder="Ej. 100" required />
-          </div>
         </div>
         
-        <div class="form-group" style="margin-bottom: 1.5rem;">
-          <label>Precio Unitario ($)</label>
-          <input type="number" id="order-price" step="0.01" min="0.01" placeholder="Ej. 1.25" required />
+        <!-- Campo de zona personalizada (Otros) -->
+        <div class="form-group hidden" id="custom-zone-group" style="margin-top: -0.5rem; margin-bottom: 1.2rem;">
+          <label>Especificar Zona</label>
+          <input type="text" id="order-zone-custom" placeholder="Escribe el nombre de la zona" />
+        </div>
+
+        <!-- Sección de Item individual a añadir al pedido -->
+        <div class="chart-card" style="padding: 1.5rem; margin-bottom: 1.5rem; background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.05);">
+          <h4 style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.5px;">Añadir Producto al Pedido</h4>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Producto</label>
+              <select id="order-product">
+                <option value="Bloque A">Bloque A</option>
+                <option value="Bloque B">Bloque B</option>
+                <option value="Bloque C">Bloque C</option>
+                <option value="Adoquín">Adoquín</option>
+                <option value="Bordillo">Bordillo</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>Cantidad</label>
+              <input type="number" id="order-qty" min="1" placeholder="Ej. 100" />
+            </div>
+          </div>
+          
+          <div class="form-group" style="margin-bottom: 1.2rem;">
+            <label>Precio Unitario ($)</label>
+            <input type="number" id="order-price" step="0.01" min="0.01" placeholder="Ej. 1.25" />
+          </div>
+          
+          <button type="button" id="addItemBtn" style="background: rgba(56, 189, 248, 0.08); border: 1px dashed var(--primary); color: #38bdf8; box-shadow: none;">➕ Agregar Item al Pedido</button>
+        </div>
+
+        <!-- Carrito de Items Agregados (Visual) -->
+        <div id="staged-items-container" class="hidden" style="margin-bottom: 1.8rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1.2rem;">
+          <h4 style="font-size: 0.85rem; color: #cbd5e1; margin-bottom: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Productos en este Pedido</h4>
+          <div class="table-responsive">
+            <table class="history-table" style="font-size: 0.8rem;">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Cantidad</th>
+                  <th>Precio Unit.</th>
+                  <th>Total</th>
+                  <th style="text-align: center; width: 80px;">Eliminar</th>
+                </tr>
+              </thead>
+              <tbody id="stagedItemsBody">
+                <!-- Se cargan dinámicamente -->
+              </tbody>
+            </table>
+          </div>
         </div>
         
         <div style="display: flex; gap: 1rem;">
@@ -263,7 +290,6 @@
 
       <!-- Pestaña 2: Registrar Ventas (Admin Only) -->
       <div id="admin-orders-content" class="admin-tab-content hidden">
-        <!-- El contenido de esta pestaña se cargará dinámicamente insertando el formulario de vendedor aquí -->
         <div id="form-container-placeholder"></div>
       </div>
 

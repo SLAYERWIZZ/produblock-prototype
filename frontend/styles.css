@@ -476,6 +476,7 @@ button:active {
   align-items: center;
   gap: 1rem;
   box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+  min-width: 0; /* Corrección crítica de desbordamiento en layouts de grid de CSS */
 }
 
 .kpi-icon {
@@ -489,6 +490,12 @@ button:active {
   justify-content: center;
   width: 46px;
   height: 46px;
+  flex-shrink: 0;
+}
+
+.kpi-info {
+  min-width: 0; /* Permite que el texto trunque dentro del flex container */
+  flex-grow: 1;
 }
 
 .kpi-info h5 {
@@ -498,12 +505,18 @@ button:active {
   letter-spacing: 0.5px;
   font-weight: 600;
   margin-bottom: 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .kpi-info h3 {
   font-size: 1.35rem;
   font-weight: 700;
   color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .kpi-info h4 {
@@ -513,13 +526,16 @@ button:active {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 130px;
+  max-width: 100%;
 }
 
 .kpi-info p {
   font-size: 0.7rem;
   color: #94a3b8;
   margin-top: 0.1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* KPIs de Valor Agradecido */

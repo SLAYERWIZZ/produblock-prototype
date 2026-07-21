@@ -108,10 +108,12 @@ def login():
         if user.status != 'active':
             return jsonify({'status': 'error', 'msg': 'Tu cuenta está pendiente de aprobación por el administrador.'}), 403
             
-        # Guardar log de inicio de sesión exitoso
-        ahora = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # Guardar log de inicio de sesión exitoso en hora de Ecuador (UTC-5)
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        ecuador_tz = datetime.timezone(datetime.timedelta(hours=-5))
+        ahora = now_utc.astimezone(ecuador_tz).strftime('%Y-%m-%d %H:%M:%S')
+        
         ip = request.remote_addr or '127.0.0.1'
-        # Si se corre detrás de un proxy (como Render), obtener la IP del cliente real
         if request.headers.get('X-Forwarded-For'):
             ip = request.headers.get('X-Forwarded-For').split(',')[0].strip()
             
@@ -257,7 +259,7 @@ def get_orders():
     if not check_role(['vendedor', 'analista', 'admin']):
         return jsonify({'status': 'error', 'msg': 'Acceso denegado'}), 403
     
-    pedidos = Pedido.query.order_by(Pedido.id.desc()).all() # Cargar todos los pedidos para filtros en el cliente
+    pedidos = Pedido.query.order_by(Pedido.id.desc()).all()
     resultado = [{
         'id': p.id,
         'fecha': p.fecha,
@@ -276,26 +278,48 @@ def add_order():
         return jsonify({'status': 'error', 'msg': 'Acceso denegado'}), 403
     
     data = request.json
-    required = ['fecha', 'producto', 'zona', 'cantidad', 'precio_uni']
-    if not all(k in data for k in required):
-        return jsonify({'status': 'error', 'msg': 'Faltan campos requeridos'}), 400
-        
     vendedor = request.headers.get('X-User-Username', 'vendedor1')
+    
+    # Soporte para lista de items (carrito) o item único legacy
+    items = data.get('items', [])
+    if not items:
+        # Fallback a formato clásico de item único
+        required = ['fecha', 'producto', 'zona', 'cantidad', 'precio_uni']
+        if not all(k in data for k in required):
+            return jsonify({'status': 'error', 'msg': 'Faltan campos requeridos'}), 400
+        items = [{
+            'producto': data['producto'],
+            'cantidad': data['cantidad'],
+            'precio_uni': data['precio_uni']
+        }]
+    else:
+        # Validar campos comunes del lote
+        if not data.get('fecha') or not data.get('zona'):
+            return jsonify({'status': 'error', 'msg': 'Faltan campos obligatorios (fecha o zona)'}), 400
         
     try:
-        total = round(int(data['cantidad']) * float(data['precio_uni']), 2)
-        nuevo_pedido = Pedido(
-            fecha=data['fecha'],
-            producto=data['producto'],
-            zona=data['zona'],
-            cantidad=int(data['cantidad']),
-            precio_uni=float(data['precio_uni']),
-            total=total,
-            vendedor_username=vendedor
-        )
-        db.session.add(nuevo_pedido)
+        created_pedidos = []
+        total_amount = 0.0
+        for item in items:
+            qty = int(item['cantidad'])
+            price = float(item['precio_uni'])
+            total = round(qty * price, 2)
+            total_amount += total
+            
+            nuevo_pedido = Pedido(
+                fecha=data['fecha'],
+                producto=item['producto'],
+                zona=data['zona'],
+                cantidad=qty,
+                precio_uni=price,
+                total=total,
+                vendedor_username=vendedor
+            )
+            db.session.add(nuevo_pedido)
+            created_pedidos.append(nuevo_pedido)
+            
         db.session.commit()
-        return jsonify({'status': 'ok', 'total': total}), 201
+        return jsonify({'status': 'ok', 'total': round(total_amount, 2)}), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({'status': 'error', 'msg': str(e)}), 500
@@ -378,7 +402,11 @@ def backup():
     if not check_role(['admin']):
         return jsonify({'status': 'error', 'msg': 'Acceso denegado (Requiere rol Admin)'}), 403
     
-    now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    # Calcular fecha y hora de respaldo en zona horaria de Ecuador (UTC-5)
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    ecuador_tz = datetime.timezone(datetime.timedelta(hours=-5))
+    now = now_utc.astimezone(ecuador_tz).strftime('%Y%m%d_%H%M%S')
+    
     backup_dir = 'backups'
     os.makedirs(backup_dir, exist_ok=True)
     
