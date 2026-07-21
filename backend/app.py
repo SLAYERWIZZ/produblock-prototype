@@ -5,8 +5,11 @@ import os, datetime, shutil
 
 app = Flask(__name__)
 
-# Configuración de base de datos SQLite
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///produblock.db'
+# Configuración de base de datos relacional (PostgreSQL en la nube, SQLite en local)
+db_url = os.environ.get('DATABASE_URL', 'sqlite:///produblock.db')
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
