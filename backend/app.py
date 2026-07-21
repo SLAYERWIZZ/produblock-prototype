@@ -40,11 +40,15 @@ with app.app_context():
     try:
         db.session.query(Usuario.status).first()
     except Exception as e:
+        db.session.rollback()  # Limpiar la transacción abortada en PostgreSQL
         recreate_db = True
         
     if recreate_db:
         print("Recreando base de datos para aplicar columna 'status'...")
-        db.drop_all()
+        try:
+            db.drop_all()
+        except Exception:
+            db.session.rollback()
         db.create_all()
     else:
         db.create_all()
