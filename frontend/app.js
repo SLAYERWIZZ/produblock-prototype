@@ -8,6 +8,27 @@ const dashboard = document.getElementById('dashboard');
 const orderFormSection = document.getElementById('order-form-section');
 const loginMsg = document.getElementById('loginMsg');
 
+// Toggle Login / Registro Público
+const showRegisterLink = document.getElementById('showRegisterLink');
+const showLoginLink = document.getElementById('showLoginLink');
+const loginFormView = document.getElementById('login-form-view');
+const registerFormView = document.getElementById('register-form-view');
+
+if (showRegisterLink && showLoginLink) {
+  showRegisterLink.onclick = (e) => {
+    e.preventDefault();
+    loginFormView.classList.add('hidden');
+    registerFormView.classList.remove('hidden');
+    document.getElementById('regMsg').textContent = '';
+  };
+  showLoginLink.onclick = (e) => {
+    e.preventDefault();
+    registerFormView.classList.add('hidden');
+    loginFormView.classList.remove('hidden');
+    loginMsg.textContent = '';
+  };
+}
+
 // --- Autocompletar fecha de hoy ---
 const today = new Date().toISOString().split('T')[0];
 const dateInput = document.getElementById('order-date');
@@ -30,6 +51,44 @@ if (savedRole) {
   initSession(savedRole);
 }
 
+// Registro Público
+const registerBtn = document.getElementById('registerBtn');
+const regMsg = document.getElementById('regMsg');
+if (registerBtn) {
+  registerBtn.onclick = async () => {
+    const user = document.getElementById('reg-username').value;
+    const pwd = document.getElementById('reg-password').value;
+    const role = document.getElementById('reg-role').value;
+
+    if (!user || !pwd) {
+      regMsg.textContent = 'Por favor completa todos los campos.';
+      regMsg.style.color = 'var(--danger)';
+      return;
+    }
+
+    try {
+      const resp = await fetch(`${api}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user, password: pwd, role: role })
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        regMsg.textContent = data.msg;
+        regMsg.style.color = 'var(--accent)';
+        document.getElementById('reg-username').value = '';
+        document.getElementById('reg-password').value = '';
+      } else {
+        regMsg.textContent = data.msg || 'Error al registrar';
+        regMsg.style.color = 'var(--danger)';
+      }
+    } catch (e) {
+      regMsg.textContent = 'Error de red';
+      regMsg.style.color = 'var(--danger)';
+    }
+  };
+}
+
 loginBtn.onclick = async () => {
   const user = document.getElementById('username').value;
   const pwd = document.getElementById('password').value;
@@ -48,11 +107,11 @@ loginBtn.onclick = async () => {
       initSession(data.role);
     } else {
       loginMsg.textContent = data.msg || 'Error de autenticación';
-      loginMsg.style.color = '#e74c3c';
+      loginMsg.style.color = 'var(--danger)';
     }
   } catch (error) {
     loginMsg.textContent = 'Error de conexión con el servidor';
-    loginMsg.style.color = '#e74c3c';
+    loginMsg.style.color = 'var(--danger)';
   }
 };
 
@@ -65,6 +124,13 @@ if (logoutBtn) logoutBtn.onclick = handleLogout;
 if (logoutBtn2) logoutBtn2.onclick = handleLogout;
 
 function initSession(role) {
+  const username = sessionStorage.getItem('username') || 'Usuario';
+  
+  const vName = document.getElementById('vendedor-name');
+  if (vName) vName.textContent = username;
+  const aName = document.getElementById('analista-name');
+  if (aName) aName.textContent = username;
+
   if (role === 'vendedor') {
     orderFormSection.classList.remove('hidden');
     dashboard.classList.add('hidden');
@@ -72,16 +138,39 @@ function initSession(role) {
   } else if (role === 'analista') {
     orderFormSection.classList.add('hidden');
     dashboard.classList.remove('hidden');
+    document.getElementById('admin-controls-wrapper').classList.add('hidden');
     loadCharts();
   } else if (role === 'admin') {
     orderFormSection.classList.remove('hidden');
     dashboard.classList.remove('hidden');
+    document.getElementById('admin-controls-wrapper').classList.remove('hidden');
+    
+    // Cambiar etiquetas del perfil admin
+    const vRole = document.getElementById('vendedor-role');
+    if (vRole) { vRole.textContent = 'Admin'; vRole.style.background = 'rgba(167, 139, 250, 0.15)'; vRole.style.color = '#a78bfa'; }
+    const aRole = document.getElementById('analista-role');
+    if (aRole) { aRole.textContent = 'Admin'; aRole.style.background = 'rgba(167, 139, 250, 0.15)'; aRole.style.color = '#a78bfa'; }
+
     loadHistory();
     loadCharts();
+    loadUsersList();
   }
 }
 
-// --- Cargar Historial de Pedidos ---
+// --- Obtener la etiqueta (badge) HTML según el producto ---
+function getProductBadgeHTML(product) {
+  const norm = product.toLowerCase()
+    .replace(/á/g, 'a')
+    .replace(/í/g, 'i')
+    .replace(/ó/g, 'o')
+    .replace(/ú/g, 'u')
+    .replace(/\s+/g, '-');
+  return `<span class="badge badge-${norm}">${product}</span>`;
+}
+
+// --- Cargar Historial de Pedidos (con opción de editar) ---
+let loadedOrdersList = [];
+
 async function loadHistory() {
   const historyBody = document.getElementById('historyBody');
   const emptyHistoryMsg = document.getElementById('emptyHistoryMsg');
@@ -91,6 +180,7 @@ async function loadHistory() {
     const resp = await fetchWithAuth(`${api}/orders`);
     if (!resp.ok) throw new Error('Error al cargar historial');
     const orders = await resp.json();
+    loadedOrdersList = orders; // guardar copia
     
     historyBody.innerHTML = '';
     
@@ -107,11 +197,14 @@ async function loadHistory() {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${order.fecha}</td>
-        <td>${order.producto}</td>
+        <td>${getProductBadgeHTML(order.producto)}</td>
         <td>${order.zona}</td>
         <td>${order.cantidad}</td>
         <td>$${parseFloat(order.precio_uni).toFixed(2)}</td>
         <td style="font-weight: 600; color: var(--accent);">$${parseFloat(order.total).toFixed(2)}</td>
+        <td style="text-align: center;">
+          <button class="btn-action btn-edit" onclick="startEditOrder(${order.id})">✏️ Editar</button>
+        </td>
       `;
       historyBody.appendChild(tr);
     });
@@ -120,14 +213,56 @@ async function loadHistory() {
   }
 }
 
-// --- Guardar Pedido ---
+// --- Flujo de Edición de Pedidos ---
+let editOrderId = null;
+const formActionTitle = document.getElementById('form-action-title');
+const cancelEditBtn = document.getElementById('cancelEditBtn');
+const submitOrderBtn = document.getElementById('submitOrderBtn');
+
+window.startEditOrder = (id) => {
+  const order = loadedOrdersList.find(o => o.id === id);
+  if (!order) return;
+
+  editOrderId = id;
+  formActionTitle.textContent = 'Corregir / Editar Pedido';
+  submitOrderBtn.textContent = 'Guardar Cambios';
+  cancelEditBtn.classList.remove('hidden');
+
+  // Llenar formulario
+  document.getElementById('order-date').value = order.fecha;
+  document.getElementById('order-product').value = order.producto;
+  document.getElementById('order-zone').value = order.zona;
+  document.getElementById('order-qty').value = order.cantidad;
+  document.getElementById('order-price').value = order.precio_uni;
+
+  // Hacer scroll hacia el formulario
+  document.getElementById('orderForm').scrollIntoView({ behavior: 'smooth' });
+};
+
+function resetOrderForm() {
+  editOrderId = null;
+  formActionTitle.textContent = 'Registrar Pedido';
+  submitOrderBtn.textContent = 'Guardar Registro de Pedido';
+  cancelEditBtn.classList.add('hidden');
+  orderForm.reset();
+  if (dateInput) dateInput.value = today;
+}
+
+if (cancelEditBtn) {
+  cancelEditBtn.onclick = () => {
+    resetOrderForm();
+    orderMsg.textContent = '';
+  };
+}
+
+// --- Guardar / Actualizar Pedido ---
 const orderForm = document.getElementById('orderForm');
 const orderMsg = document.getElementById('orderMsg');
 
 if (orderForm) {
   orderForm.onsubmit = async (e) => {
     e.preventDefault();
-    orderMsg.textContent = 'Guardando pedido...';
+    orderMsg.textContent = editOrderId ? 'Guardando cambios...' : 'Guardando pedido...';
     orderMsg.style.color = '#fff';
 
     const orderData = {
@@ -138,24 +273,23 @@ if (orderForm) {
       precio_uni: parseFloat(document.getElementById('order-price').value)
     };
 
+    const url = editOrderId ? `${api}/orders/${editOrderId}` : `${api}/orders`;
+    const method = editOrderId ? 'PUT' : 'POST';
+
     try {
-      const resp = await fetchWithAuth(`${api}/orders`, {
-        method: 'POST',
+      const resp = await fetchWithAuth(url, {
+        method: method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderData)
       });
       const data = await resp.json();
 
       if (resp.ok) {
-        orderMsg.textContent = `¡Pedido guardado! Total: $${data.total}`;
+        orderMsg.textContent = editOrderId ? '¡Pedido corregido con éxito!' : `¡Pedido guardado! Total: $${data.total}`;
         orderMsg.style.color = 'var(--accent)';
-        orderForm.reset();
-        if (dateInput) dateInput.value = today; // restaurar fecha de hoy
-        
-        // Recargar historial
+        resetOrderForm();
         loadHistory();
         
-        // Si es admin, refrescar las gráficas también
         const currentRole = sessionStorage.getItem('userRole');
         if (currentRole === 'admin') {
           loadCharts();
@@ -171,17 +305,114 @@ if (orderForm) {
   };
 }
 
+// --- GESTIÓN DE USUARIOS (SOLO ADMINISTRADOR) ---
+async function loadUsersList() {
+  const body = document.getElementById('usersListBody');
+  if (!body) return;
+
+  try {
+    const resp = await fetchWithAuth(`${api}/users`);
+    if (!resp.ok) throw new Error('Error al cargar usuarios');
+    const users = await resp.json();
+
+    body.innerHTML = '';
+    users.forEach(u => {
+      const tr = document.createElement('tr');
+      
+      // Botón de acción dependiendo del estado
+      let actionBtnHTML = '';
+      if (u.username !== 'admin') {
+        if (u.status === 'pending') {
+          actionBtnHTML = `<button class="btn-action btn-approve" onclick="changeUserStatus(${u.id}, 'active')">✔️ Aprobar</button>`;
+        } else if (u.status === 'active') {
+          actionBtnHTML = `<button class="btn-action btn-disable" onclick="changeUserStatus(${u.id}, 'inactive')">❌ Bloquear</button>`;
+        } else if (u.status === 'inactive') {
+          actionBtnHTML = `<button class="btn-action btn-approve" onclick="changeUserStatus(${u.id}, 'active')">✔️ Activar</button>`;
+        }
+      } else {
+        actionBtnHTML = `<span style="color: #64748b; font-style: italic;">Sin acciones</span>`;
+      }
+
+      tr.innerHTML = `
+        <td style="font-weight: 600;">${u.username}</td>
+        <td><span class="badge-role" style="font-size: 0.65rem;">${u.role}</span></td>
+        <td><span class="badge-status status-${u.status}">${u.status === 'active' ? 'Activo' : u.status === 'pending' ? 'Pendiente' : 'Bloqueado'}</span></td>
+        <td style="text-align: center;">${actionBtnHTML}</td>
+      `;
+      body.appendChild(tr);
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+window.changeUserStatus = async (id, newStatus) => {
+  try {
+    const resp = await fetchWithAuth(`${api}/users/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    });
+    if (resp.ok) {
+      loadUsersList();
+    } else {
+      const data = await resp.json();
+      alert(data.msg || 'Error al cambiar estado');
+    }
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+// Crear usuario desde panel de Administrador
+const adminCreateUserForm = document.getElementById('adminCreateUserForm');
+const adminUserMsg = document.getElementById('adminUserMsg');
+
+if (adminCreateUserForm) {
+  adminCreateUserForm.onsubmit = async (e) => {
+    e.preventDefault();
+    adminUserMsg.textContent = 'Creando usuario...';
+    adminUserMsg.style.color = '#fff';
+
+    const userData = {
+      username: document.getElementById('admin-u-name').value,
+      password: document.getElementById('admin-u-pass').value,
+      role: document.getElementById('admin-u-role').value,
+      status: 'active' // admin los crea activos directamente
+    };
+
+    try {
+      const resp = await fetchWithAuth(`${api}/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+      if (resp.ok) {
+        adminUserMsg.textContent = '¡Usuario creado y activado!';
+        adminUserMsg.style.color = 'var(--accent)';
+        adminCreateUserForm.reset();
+        loadUsersList();
+      } else {
+        const data = await resp.json();
+        adminUserMsg.textContent = data.msg || 'Error al crear usuario';
+        adminUserMsg.style.color = 'var(--danger)';
+      }
+    } catch (err) {
+      adminUserMsg.textContent = 'Error de conexión';
+      adminUserMsg.style.color = 'var(--danger)';
+    }
+  };
+}
+
 // --- Lógica de pestañas del dashboard ---
 const tabButtons = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
 tabButtons.forEach(btn => {
   btn.onclick = () => {
-    // Activar botón
     tabButtons.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     
-    // Activar contenido
     const targetTab = btn.getAttribute('data-tab');
     tabContents.forEach(content => {
       if (content.id === targetTab) {
@@ -202,21 +433,17 @@ async function loadCharts() {
   const tabsContainer = document.querySelector('.tabs-container');
 
   try {
-    // 1. Obtener datos por producto
     const tpResp = await fetchWithAuth(`${api}/top_products`);
     if (!tpResp.ok) throw new Error('Error al obtener productos');
     const tp = await tpResp.json();
     
-    // Verificar si la base está completamente vacía
     if (Object.keys(tp).length === 0) {
-      // Ocultar wrapper y pestañas, mostrar mensaje
       chartsWrapper.classList.add('hidden');
       tabsContainer.classList.add('hidden');
       noDataMsg.classList.remove('hidden');
       return;
     }
 
-    // Mostrar wrapper y pestañas, ocultar mensaje
     chartsWrapper.classList.remove('hidden');
     tabsContainer.classList.remove('hidden');
     noDataMsg.classList.add('hidden');
@@ -230,10 +457,10 @@ async function loadCharts() {
         datasets: [{
           label: 'Total vendido ($)',
           data: Object.values(tp),
-          backgroundColor: 'rgba(52, 152, 219, 0.65)',
-          borderColor: 'rgba(52, 152, 219, 1)',
+          backgroundColor: 'rgba(56, 189, 248, 0.75)',
+          borderColor: 'rgba(56, 189, 248, 1)',
           borderWidth: 1.5,
-          borderRadius: 4
+          borderRadius: 6
         }]
       },
       options: {
@@ -241,11 +468,11 @@ async function loadCharts() {
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          title: { display: true, text: 'Ventas Totales por Tipo de Producto ($)', color: '#e2e8f0', font: { size: 14 } }
+          title: { display: true, text: 'Ventas Totales por Tipo de Producto ($)', color: '#f1f5f9', font: { size: 14, weight: 'bold' } }
         },
         scales: {
-          y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#a0aec0' } },
-          x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#a0aec0' } }
+          y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#94a3b8' } },
+          x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#94a3b8' } }
         }
       }
     });
@@ -274,12 +501,12 @@ async function loadCharts() {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          title: { display: true, text: 'Historial Temporal de Ventas ($)', color: '#e2e8f0', font: { size: 14 } },
-          legend: { labels: { color: '#cbd5e0' } }
+          title: { display: true, text: 'Historial Temporal de Ventas ($)', color: '#f1f5f9', font: { size: 14, weight: 'bold' } },
+          legend: { labels: { color: '#94a3b8' } }
         },
         scales: {
-          y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#a0aec0' } },
-          x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#a0aec0' } }
+          y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#94a3b8' } },
+          x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#94a3b8' } }
         }
       }
     });
@@ -297,11 +524,11 @@ async function loadCharts() {
         datasets: [{
           data: Object.values(sz),
           backgroundColor: [
-            'rgba(231, 76, 60, 0.8)',
+            'rgba(244, 63, 94, 0.8)',
             'rgba(241, 196, 15, 0.8)',
-            'rgba(46, 204, 113, 0.8)',
-            'rgba(52, 152, 219, 0.8)',
-            'rgba(155, 89, 182, 0.8)'
+            'rgba(52, 211, 153, 0.8)',
+            'rgba(56, 189, 248, 0.8)',
+            'rgba(167, 139, 250, 0.8)'
           ],
           borderColor: 'rgba(255,255,255,0.1)',
           borderWidth: 1
@@ -311,8 +538,8 @@ async function loadCharts() {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          title: { display: true, text: 'Distribución Geográfica de Ventas ($)', color: '#e2e8f0', font: { size: 14 } },
-          legend: { labels: { color: '#cbd5e0' } }
+          title: { display: true, text: 'Distribución Geográfica de Ventas ($)', color: '#f1f5f9', font: { size: 14, weight: 'bold' } },
+          legend: { labels: { color: '#94a3b8' } }
         }
       }
     });

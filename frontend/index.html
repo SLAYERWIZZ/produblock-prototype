@@ -6,69 +6,130 @@
   <title>PRODUBLOK SAS – Pedidos y Analítica</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+  <!-- Blobs decorativos de fondo -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+
   <div class="container">
-    <h1 class="title">🔎 PRODUBLOK SAS</h1>
+    <h1 class="title">🏢 PRODUBLOK SAS</h1>
     
-    <!-- Sección de Login -->
+    <!-- Sección de Login / Registro -->
     <section id="login-section" class="card">
-      <h2>Iniciar sesión</h2>
-      <input type="text" id="username" placeholder="Usuario" />
-      <input type="password" id="password" placeholder="Contraseña" />
-      <button id="loginBtn">Acceder</button>
-      <p id="loginMsg" class="msg"></p>
+      <!-- Vista de Login -->
+      <div id="login-form-view">
+        <div style="text-align: center; margin-bottom: 2rem;">
+          <span class="logo-icon" style="font-size: 3rem; display: block; margin-bottom: 0.5rem;">🏗️</span>
+          <h2 style="margin-bottom: 0.5rem;">Iniciar Sesión</h2>
+          <p style="font-size: 0.85rem; color: #a0aec0;">Sistema Integrado de Pedidos y Analítica</p>
+        </div>
+        <div class="form-group">
+          <label>Usuario</label>
+          <input type="text" id="username" placeholder="Ingresa tu usuario" />
+        </div>
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label>Contraseña</label>
+          <input type="password" id="password" placeholder="Ingresa tu contraseña" />
+        </div>
+        <button id="loginBtn">Acceder al Sistema</button>
+        <p style="text-align: center; margin-top: 1.2rem; font-size: 0.85rem; color: #cbd5e1;">
+          ¿No tienes cuenta? <a href="#" id="showRegisterLink" style="color: var(--primary); text-decoration: none; font-weight: 600;">Regístrate aquí</a>
+        </p>
+        <p id="loginMsg" class="msg"></p>
+      </div>
+
+      <!-- Vista de Registro Público -->
+      <div id="register-form-view" class="hidden">
+        <div style="text-align: center; margin-bottom: 2rem;">
+          <span class="logo-icon" style="font-size: 3rem; display: block; margin-bottom: 0.5rem;">📝</span>
+          <h2 style="margin-bottom: 0.5rem;">Crear Cuenta</h2>
+          <p style="font-size: 0.85rem; color: #a0aec0;">Solicitud de registro de nuevo personal</p>
+        </div>
+        <div class="form-group">
+          <label>Nombre de Usuario</label>
+          <input type="text" id="reg-username" placeholder="Elige un usuario" />
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" id="reg-password" placeholder="Elige una contraseña" />
+        </div>
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label>Rol Solicitado</label>
+          <select id="reg-role">
+            <option value="vendedor">Vendedor (Ingreso de Pedidos)</option>
+            <option value="analista">Analista (Estadísticas y Métricas)</option>
+          </select>
+        </div>
+        <button id="registerBtn">Enviar Solicitud de Registro</button>
+        <p style="text-align: center; margin-top: 1.2rem; font-size: 0.85rem; color: #cbd5e1;">
+          ¿Ya tienes cuenta? <a href="#" id="showLoginLink" style="color: var(--primary); text-decoration: none; font-weight: 600;">Inicia sesión aquí</a>
+        </p>
+        <p id="regMsg" class="msg"></p>
+      </div>
     </section>
 
     <!-- Sección de Vendedor (Formulario e Historial) -->
     <section id="order-form-section" class="card hidden">
       <div class="section-header">
-        <h2>Registrar Nuevo Pedido</h2>
+        <div>
+          <h2 id="form-action-title">Registrar Pedido</h2>
+          <div class="user-profile-header">
+            Conectado como: <strong id="vendedor-name">...</strong> <span class="badge-role" id="vendedor-role">Vendedor</span>
+          </div>
+        </div>
         <button id="logoutBtn2" class="logout">Cerrar sesión</button>
       </div>
       
       <form id="orderForm" onsubmit="return false;">
-        <div class="form-group">
-          <label>Fecha</label>
-          <input type="date" id="order-date" required />
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Fecha del Pedido</label>
+            <input type="date" id="order-date" required />
+          </div>
+          
+          <div class="form-group">
+            <label>Producto</label>
+            <select id="order-product" required>
+              <option value="Bloque A">Bloque A</option>
+              <option value="Bloque B">Bloque B</option>
+              <option value="Bloque C">Bloque C</option>
+              <option value="Adoquín">Adoquín</option>
+              <option value="Bordillo">Bordillo</option>
+            </select>
+          </div>
         </div>
         
-        <div class="form-group">
-          <label>Producto</label>
-          <select id="order-product" required>
-            <option value="Bloque A">Bloque A</option>
-            <option value="Bloque B">Bloque B</option>
-            <option value="Bloque C">Bloque C</option>
-            <option value="Adoquín">Adoquín</option>
-            <option value="Bordillo">Bordillo</option>
-          </select>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Zona de Distribución</label>
+            <select id="order-zone" required>
+              <option value="Quito Norte">Quito Norte</option>
+              <option value="Quito Sur">Quito Sur</option>
+              <option value="Cumbayá">Cumbayá</option>
+              <option value="Tumbaco">Tumbaco</option>
+              <option value="Calderón">Calderón</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label>Cantidad</label>
+            <input type="number" id="order-qty" min="1" placeholder="Ej. 100" required />
+          </div>
         </div>
         
-        <div class="form-group">
-          <label>Zona de Distribución</label>
-          <select id="order-zone" required>
-            <option value="Quito Norte">Quito Norte</option>
-            <option value="Quito Sur">Quito Sur</option>
-            <option value="Cumbayá">Cumbayá</option>
-            <option value="Tumbaco">Tumbaco</option>
-            <option value="Calderón">Calderón</option>
-          </select>
-        </div>
-        
-        <div class="form-group">
-          <label>Cantidad</label>
-          <input type="number" id="order-qty" min="1" placeholder="Ej. 50" required />
-        </div>
-        
-        <div class="form-group">
+        <div class="form-group" style="margin-bottom: 1.5rem;">
           <label>Precio Unitario ($)</label>
-          <input type="number" id="order-price" step="0.01" min="0.1" placeholder="Ej. 2.50" required />
+          <input type="number" id="order-price" step="0.01" min="0.01" placeholder="Ej. 1.25" required />
         </div>
         
-        <button type="submit" id="submitOrderBtn">Guardar Pedido</button>
+        <div style="display: flex; gap: 1rem;">
+          <button type="submit" id="submitOrderBtn" style="flex: 2;">Guardar Registro de Pedido</button>
+          <button type="button" id="cancelEditBtn" class="logout hidden" style="flex: 1; margin: 0; padding: 0.95rem;">Cancelar</button>
+        </div>
         <p id="orderMsg" class="msg"></p>
       </form>
 
@@ -85,6 +146,7 @@
                 <th>Cantidad</th>
                 <th>Precio Unit.</th>
                 <th>Total</th>
+                <th style="text-align: center;">Acciones</th>
               </tr>
             </thead>
             <tbody id="historyBody">
@@ -96,10 +158,15 @@
       </div>
     </section>
 
-    <!-- Sección de Analista (Dashboard con 3 pestañas) -->
+    <!-- Sección de Analista / Administrador -->
     <section id="dashboard" class="card hidden">
       <div class="section-header">
-        <h2 style="margin: 0 auto; text-align: center;">Analítica de Ventas</h2>
+        <div>
+          <h2>Analítica de Ventas</h2>
+          <div class="user-profile-header">
+            Conectado como: <strong id="analista-name">...</strong> <span class="badge-role" id="analista-role">Analista</span>
+          </div>
+        </div>
         <button id="logoutBtn" class="logout">Cerrar sesión</button>
       </div>
       
@@ -111,25 +178,77 @@
       </div>
 
       <!-- Mensaje si no hay datos -->
-      <p id="noDataMsg" class="hidden msg" style="text-align: center; color: #888; padding: 3rem 0; font-size: 1.1rem; font-weight: 500;">
-        Aún no hay pedidos registrados para mostrar métricas.
+      <p id="noDataMsg" class="hidden msg" style="text-align: center; color: #888; padding: 4rem 0; font-size: 1.1rem; font-weight: 500;">
+        Aún no hay pedidos registrados en la base de datos SQL para mostrar métricas.
       </p>
 
       <!-- Contenedores de gráficos -->
       <div id="charts-wrapper">
         <div id="products-tab" class="tab-content">
-          <div class="chart-container">
+          <div class="chart-card">
             <canvas id="topProductsChart"></canvas>
           </div>
         </div>
         <div id="month-tab" class="tab-content hidden">
-          <div class="chart-container">
+          <div class="chart-card">
             <canvas id="salesMonthChart"></canvas>
           </div>
         </div>
         <div id="zone-tab" class="tab-content hidden">
-          <div class="chart-container" style="max-width: 450px; margin: 0 auto;">
+          <div class="chart-card" style="max-width: 480px; margin: 0 auto;">
             <canvas id="salesZoneChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Control de Usuarios (Solo Admin) -->
+      <div id="admin-controls-wrapper" class="hidden" style="margin-top: 3rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 2rem;">
+        <h3 style="margin-bottom: 1.5rem; font-size: 1.3rem; color: #fff;">Control de Usuarios y Aprobaciones</h3>
+        
+        <div class="form-grid">
+          <!-- Formulario crear usuario directamente -->
+          <div class="chart-card" style="padding: 1.5rem;">
+            <h4 style="margin-bottom: 1.2rem; font-size: 1rem; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.5px;">Crear Usuario Nuevo</h4>
+            <form id="adminCreateUserForm" onsubmit="return false;">
+              <div class="form-group" style="margin-bottom: 0.8rem;">
+                <label>Nombre de Usuario</label>
+                <input type="text" id="admin-u-name" placeholder="Ej. vendedor2" required style="padding: 0.7rem;" />
+              </div>
+              <div class="form-group" style="margin-bottom: 0.8rem;">
+                <label>Contraseña</label>
+                <input type="password" id="admin-u-pass" placeholder="Contraseña" required style="padding: 0.7rem;" />
+              </div>
+              <div class="form-group" style="margin-bottom: 1.2rem;">
+                <label>Rol del Usuario</label>
+                <select id="admin-u-role" style="padding: 0.7rem;">
+                  <option value="vendedor">Vendedor</option>
+                  <option value="analista">Analista</option>
+                  <option value="admin">Administrador</option>
+                </select>
+              </div>
+              <button type="submit" id="adminCreateUserBtn" style="padding: 0.7rem; font-size: 0.9rem;">Crear Cuenta Activa</button>
+              <p id="adminUserMsg" class="msg"></p>
+            </form>
+          </div>
+
+          <!-- Tabla de usuarios y aprobaciones -->
+          <div class="chart-card" style="padding: 1.5rem;">
+            <h4 style="margin-bottom: 1.2rem; font-size: 1rem; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.5px;">Lista de Cuentas</h4>
+            <div class="table-responsive" style="max-height: 270px;">
+              <table class="history-table" style="font-size: 0.8rem;">
+                <thead>
+                  <tr>
+                    <th>Usuario</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th style="text-align: center;">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="usersListBody">
+                  <!-- Cargado dinámicamente -->
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
