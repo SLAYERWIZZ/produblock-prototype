@@ -35,16 +35,26 @@ class Pedido(db.Model):
 
 # Inicializar Base de Datos al arrancar la aplicación
 with app.app_context():
-    # Detectar si hay cambios en el esquema (si falta la columna 'status')
     recreate_db = False
     try:
-        db.session.query(Usuario.status).first()
+        # Usar el inspector de SQLAlchemy para comprobar si la tabla 'usuarios' tiene el tamaño de contraseña viejo
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        if 'usuarios' in inspector.get_table_names():
+            columns = inspector.get_columns('usuarios')
+            pwd_col = next((c for c in columns if c['name'] == 'password_hash'), None)
+            if pwd_col and getattr(pwd_col['type'], 'length', None) != 256:
+                recreate_db = True
+                
+        # Verificar también si la columna 'status' existe
+        if not recreate_db:
+            db.session.query(Usuario.status).first()
     except Exception as e:
         db.session.rollback()  # Limpiar la transacción abortada en PostgreSQL
         recreate_db = True
         
     if recreate_db:
-        print("Recreando base de datos para aplicar columna 'status'...")
+        print("Recreando base de datos para aplicar cambios de esquema...")
         try:
             db.drop_all()
         except Exception:
