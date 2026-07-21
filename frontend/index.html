@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PRODUBLOK SAS – Pedidos y Analítica</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1 class="title">🔎 PRODUBLOK SAS</h1>
+    
+    <!-- Sección de Login -->
+    <section id="login-section" class="card">
+      <h2>Iniciar sesión</h2>
+      <input type="text" id="username" placeholder="Usuario" />
+      <input type="password" id="password" placeholder="Contraseña" />
+      <button id="loginBtn">Acceder</button>
+      <p id="loginMsg" class="msg"></p>
+    </section>
+
+    <!-- Sección de Vendedor (Formulario e Historial) -->
+    <section id="order-form-section" class="card hidden">
+      <div class="section-header">
+        <h2>Registrar Nuevo Pedido</h2>
+        <button id="logoutBtn2" class="logout">Cerrar sesión</button>
+      </div>
+      
+      <form id="orderForm" onsubmit="return false;">
+        <div class="form-group">
+          <label>Fecha</label>
+          <input type="date" id="order-date" required />
+        </div>
+        
+        <div class="form-group">
+          <label>Producto</label>
+          <select id="order-product" required>
+            <option value="Bloque A">Bloque A</option>
+            <option value="Bloque B">Bloque B</option>
+            <option value="Bloque C">Bloque C</option>
+            <option value="Adoquín">Adoquín</option>
+            <option value="Bordillo">Bordillo</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>Zona de Distribución</label>
+          <select id="order-zone" required>
+            <option value="Quito Norte">Quito Norte</option>
+            <option value="Quito Sur">Quito Sur</option>
+            <option value="Cumbayá">Cumbayá</option>
+            <option value="Tumbaco">Tumbaco</option>
+            <option value="Calderón">Calderón</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>Cantidad</label>
+          <input type="number" id="order-qty" min="1" placeholder="Ej. 50" required />
+        </div>
+        
+        <div class="form-group">
+          <label>Precio Unitario ($)</label>
+          <input type="number" id="order-price" step="0.01" min="0.1" placeholder="Ej. 2.50" required />
+        </div>
+        
+        <button type="submit" id="submitOrderBtn">Guardar Pedido</button>
+        <p id="orderMsg" class="msg"></p>
+      </form>
+
+      <!-- Tabla de Historial Reciente -->
+      <div id="history-container">
+        <h3>Historial de Pedidos Recientes</h3>
+        <div class="table-responsive">
+          <table id="historyTable" class="history-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Producto</th>
+                <th>Zona</th>
+                <th>Cantidad</th>
+                <th>Precio Unit.</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody">
+              <!-- Cargado dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+        <p id="emptyHistoryMsg" class="msg" style="text-align: center; color: #888; display: none;">No hay pedidos registrados.</p>
+      </div>
+    </section>
+
+    <!-- Sección de Analista (Dashboard con 3 pestañas) -->
+    <section id="dashboard" class="card hidden">
+      <div class="section-header">
+        <h2 style="margin: 0 auto; text-align: center;">Analítica de Ventas</h2>
+        <button id="logoutBtn" class="logout">Cerrar sesión</button>
+      </div>
+      
+      <!-- Navegación por pestañas -->
+      <div class="tabs-container">
+        <button class="tab-btn active" data-tab="products-tab">Por Producto</button>
+        <button class="tab-btn" data-tab="month-tab">Por Mes</button>
+        <button class="tab-btn" data-tab="zone-tab">Por Zona</button>
+      </div>
+
+      <!-- Mensaje si no hay datos -->
+      <p id="noDataMsg" class="hidden msg" style="text-align: center; color: #888; padding: 3rem 0; font-size: 1.1rem; font-weight: 500;">
+        Aún no hay pedidos registrados para mostrar métricas.
+      </p>
+
+      <!-- Contenedores de gráficos -->
+      <div id="charts-wrapper">
+        <div id="products-tab" class="tab-content">
+          <div class="chart-container">
+            <canvas id="topProductsChart"></canvas>
+          </div>
+        </div>
+        <div id="month-tab" class="tab-content hidden">
+          <div class="chart-container">
+            <canvas id="salesMonthChart"></canvas>
+          </div>
+        </div>
+        <div id="zone-tab" class="tab-content hidden">
+          <div class="chart-container" style="max-width: 450px; margin: 0 auto;">
+            <canvas id="salesZoneChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
