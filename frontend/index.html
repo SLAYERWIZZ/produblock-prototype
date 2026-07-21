@@ -112,7 +112,14 @@
               <option value="Cumbayá">Cumbayá</option>
               <option value="Tumbaco">Tumbaco</option>
               <option value="Calderón">Calderón</option>
+              <option value="Otros">Otros (Especificar abajo)...</option>
             </select>
+          </div>
+          
+          <!-- Campo de zona personalizada (Otros) -->
+          <div class="form-group hidden" id="custom-zone-group">
+            <label>Especificar Zona</label>
+            <input type="text" id="order-zone-custom" placeholder="Escribe el nombre de la zona" />
           </div>
           
           <div class="form-group">
@@ -146,6 +153,7 @@
                 <th>Cantidad</th>
                 <th>Precio Unit.</th>
                 <th>Total</th>
+                <th>Vendedor</th>
                 <th style="text-align: center;">Acciones</th>
               </tr>
             </thead>
@@ -162,7 +170,7 @@
     <section id="dashboard" class="card hidden">
       <div class="section-header">
         <div>
-          <h2>Analítica de Ventas</h2>
+          <h2>Panel de Analítica e Integración</h2>
           <div class="user-profile-header">
             Conectado como: <strong id="analista-name">...</strong> <span class="badge-role" id="analista-role">Analista</span>
           </div>
@@ -170,53 +178,30 @@
         <button id="logoutBtn" class="logout">Cerrar sesión</button>
       </div>
       
-      <!-- Navegación por pestañas -->
-      <div class="tabs-container">
-        <button class="tab-btn active" data-tab="products-tab">Por Producto</button>
-        <button class="tab-btn" data-tab="month-tab">Por Mes</button>
-        <button class="tab-btn" data-tab="zone-tab">Por Zona</button>
+      <!-- Menú de Pestañas Principales para Administrador -->
+      <div id="admin-nav-tabs" class="tabs-container hidden" style="margin-bottom: 2.2rem;">
+        <button class="tab-btn active admin-tab-btn" data-admin-tab="sec-tab">🔐 Seguridad y Usuarios</button>
+        <button class="tab-btn admin-tab-btn" data-admin-tab="orders-tab">🏗️ Registrar Ventas</button>
+        <button class="tab-btn admin-tab-btn" data-admin-tab="metrics-tab">📊 Analítica Empresarial</button>
       </div>
 
-      <!-- Mensaje si no hay datos -->
-      <p id="noDataMsg" class="hidden msg" style="text-align: center; color: #888; padding: 4rem 0; font-size: 1.1rem; font-weight: 500;">
-        Aún no hay pedidos registrados en la base de datos SQL para mostrar métricas.
-      </p>
-
-      <!-- Contenedores de gráficos -->
-      <div id="charts-wrapper">
-        <div id="products-tab" class="tab-content">
-          <div class="chart-card">
-            <canvas id="topProductsChart"></canvas>
-          </div>
-        </div>
-        <div id="month-tab" class="tab-content hidden">
-          <div class="chart-card">
-            <canvas id="salesMonthChart"></canvas>
-          </div>
-        </div>
-        <div id="zone-tab" class="tab-content hidden">
-          <div class="chart-card" style="max-width: 480px; margin: 0 auto;">
-            <canvas id="salesZoneChart"></canvas>
-          </div>
-        </div>
-      </div>
-
-      <!-- Control de Usuarios (Solo Admin) -->
-      <div id="admin-controls-wrapper" class="hidden" style="margin-top: 3rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 2rem;">
-        <h3 style="margin-bottom: 1.5rem; font-size: 1.3rem; color: #fff;">Control de Usuarios y Aprobaciones</h3>
-        
+      <!-- Pestaña 1: Seguridad y Usuarios (Admin Only) -->
+      <div id="admin-sec-content" class="admin-tab-content">
+        <h3 style="margin-bottom: 1.5rem; font-size: 1.3rem; color: #fff;">Control de Seguridad y Acceso</h3>
         <div class="form-grid">
           <!-- Formulario crear usuario directamente -->
           <div class="chart-card" style="padding: 1.5rem;">
-            <h4 style="margin-bottom: 1.2rem; font-size: 1rem; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.5px;">Crear Usuario Nuevo</h4>
+            <h4 id="user-form-title" style="margin-bottom: 1.2rem; font-size: 1rem; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.5px;">Crear Usuario Nuevo</h4>
             <form id="adminCreateUserForm" onsubmit="return false;">
+              <input type="hidden" id="admin-u-id" />
               <div class="form-group" style="margin-bottom: 0.8rem;">
                 <label>Nombre de Usuario</label>
                 <input type="text" id="admin-u-name" placeholder="Ej. vendedor2" required style="padding: 0.7rem;" />
               </div>
               <div class="form-group" style="margin-bottom: 0.8rem;">
-                <label>Contraseña</label>
+                <label id="pass-field-label">Contraseña</label>
                 <input type="password" id="admin-u-pass" placeholder="Contraseña" required style="padding: 0.7rem;" />
+                <p id="pass-help-text" style="font-size: 0.7rem; color: #888; margin-top: 0.2rem; display: none;">Dejar en blanco para mantener actual</p>
               </div>
               <div class="form-group" style="margin-bottom: 1.2rem;">
                 <label>Rol del Usuario</label>
@@ -226,14 +211,17 @@
                   <option value="admin">Administrador</option>
                 </select>
               </div>
-              <button type="submit" id="adminCreateUserBtn" style="padding: 0.7rem; font-size: 0.9rem;">Crear Cuenta Activa</button>
+              <div style="display: flex; gap: 0.5rem;">
+                <button type="submit" id="adminCreateUserBtn" style="padding: 0.7rem; font-size: 0.9rem; flex: 2;">Crear Cuenta Activa</button>
+                <button type="button" id="adminCancelUserEditBtn" class="logout hidden" style="padding: 0.7rem; font-size: 0.9rem; flex: 1; margin: 0;">Cancelar</button>
+              </div>
               <p id="adminUserMsg" class="msg"></p>
             </form>
           </div>
 
           <!-- Tabla de usuarios y aprobaciones -->
           <div class="chart-card" style="padding: 1.5rem;">
-            <h4 style="margin-bottom: 1.2rem; font-size: 1rem; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.5px;">Lista de Cuentas</h4>
+            <h4 style="margin-bottom: 1.2rem; font-size: 1rem; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.5px;">Gestión de Cuentas</h4>
             <div class="table-responsive" style="max-height: 270px;">
               <table class="history-table" style="font-size: 0.8rem;">
                 <thead>
@@ -241,7 +229,7 @@
                     <th>Usuario</th>
                     <th>Rol</th>
                     <th>Estado</th>
-                    <th style="text-align: center;">Acción</th>
+                    <th style="text-align: center; width: 140px;">Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="usersListBody">
@@ -250,6 +238,173 @@
               </table>
             </div>
           </div>
+        </div>
+
+        <!-- Tabla de Auditoría de Logins -->
+        <div class="chart-card" style="margin-top: 2rem; padding: 1.5rem;">
+          <h4 style="margin-bottom: 1.2rem; font-size: 1rem; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.5px;">Historial de Inicios de Sesión (Auditoría de Seguridad)</h4>
+          <div class="table-responsive" style="max-height: 250px;">
+            <table class="history-table" style="font-size: 0.8rem;">
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>Rol</th>
+                  <th>Fecha y Hora</th>
+                  <th>Dirección IP</th>
+                </tr>
+              </thead>
+              <tbody id="loginLogsBody">
+                <!-- Cargado dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pestaña 2: Registrar Ventas (Admin Only) -->
+      <div id="admin-orders-content" class="admin-tab-content hidden">
+        <!-- El contenido de esta pestaña se cargará dinámicamente insertando el formulario de vendedor aquí -->
+        <div id="form-container-placeholder"></div>
+      </div>
+
+      <!-- Pestaña 3: Analítica Empresarial (Admin y Analista) -->
+      <div id="admin-metrics-content" class="admin-tab-content hidden">
+        
+        <!-- 1. Tarjetas KPI Rápidos -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-icon">💰</span>
+            <div class="kpi-info">
+              <h5>Total Ventas</h5>
+              <h3 id="kpi-total-sales">$0.00</h3>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-icon">📦</span>
+            <div class="kpi-info">
+              <h5>Pedidos</h5>
+              <h3 id="kpi-orders-count">0</h3>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-icon">🧱</span>
+            <div class="kpi-info">
+              <h5>Tipos Producto</h5>
+              <h3 id="kpi-products-count">0</h3>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-icon">👥</span>
+            <div class="kpi-info">
+              <h5>Usuarios Activos</h5>
+              <h3 id="kpi-users-count">0</h3>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tarjetas Especiales de Negocio -->
+        <div class="kpi-grid" style="margin-bottom: 2.2rem; margin-top: 1.2rem;">
+          <div class="kpi-card special-kpi">
+            <span class="kpi-icon">🏆</span>
+            <div class="kpi-info">
+              <h5>Producto Estrella</h5>
+              <h4 id="kpi-star-product">Cargando...</h4>
+              <p id="kpi-star-product-percentage">0% del volumen</p>
+            </div>
+          </div>
+          <div class="kpi-card special-kpi">
+            <span class="kpi-icon">📈</span>
+            <div class="kpi-info">
+              <h5>Crecimiento Mensual</h5>
+              <h4 id="kpi-trend-growth">Sin cambios</h4>
+              <p id="kpi-trend-compare">vs mes anterior</p>
+            </div>
+          </div>
+          <div class="kpi-card special-kpi">
+            <span class="kpi-icon">🌎</span>
+            <div class="kpi-info">
+              <h5>Zona Líder</h5>
+              <h4 id="kpi-top-zone">Cargando...</h4>
+              <p id="kpi-top-zone-orders">0 pedidos</p>
+            </div>
+          </div>
+          <div class="kpi-card special-kpi">
+            <span class="kpi-icon">👤</span>
+            <div class="kpi-info">
+              <h5>Vendedor Top</h5>
+              <h4 id="kpi-top-seller">Cargando...</h4>
+              <p id="kpi-top-seller-orders">0 ventas</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Filtros Dinámicos -->
+        <div class="filters-card">
+          <h4 style="margin-bottom: 1rem; font-size: 0.9rem; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.5px;">Filtros de Dashboard</h4>
+          <div class="filters-grid">
+            <div class="form-group" style="margin: 0;">
+              <label style="font-size: 0.7rem;">Año</label>
+              <select id="filter-year" style="padding: 0.5rem; font-size: 0.85rem;"><option value="">Todos</option></select>
+            </div>
+            <div class="form-group" style="margin: 0;">
+              <label style="font-size: 0.7rem;">Mes</label>
+              <select id="filter-month" style="padding: 0.5rem; font-size: 0.85rem;"><option value="">Todos</option></select>
+            </div>
+            <div class="form-group" style="margin: 0;">
+              <label style="font-size: 0.7rem;">Zona</label>
+              <select id="filter-zone" style="padding: 0.5rem; font-size: 0.85rem;"><option value="">Todos</option></select>
+            </div>
+            <div class="form-group" style="margin: 0;">
+              <label style="font-size: 0.7rem;">Producto</label>
+              <select id="filter-product" style="padding: 0.5rem; font-size: 0.85rem;"><option value="">Todos</option></select>
+            </div>
+          </div>
+          <button id="resetFiltersBtn" class="logout" style="margin-top: 1.2rem; width: auto; font-size: 0.8rem; padding: 0.45rem 1rem;">Restablecer Filtros</button>
+        </div>
+
+        <!-- Navegación por pestañas de gráficos -->
+        <div class="tabs-container" style="margin-top: 2rem;">
+          <button class="tab-btn active chart-tab-btn" data-chart-tab="products-tab">Por Producto</button>
+          <button class="tab-btn chart-tab-btn" data-chart-tab="month-tab">Por Mes</button>
+          <button class="tab-btn chart-tab-btn" data-chart-tab="zone-tab">Por Zona</button>
+        </div>
+
+        <!-- Mensaje si no hay datos -->
+        <p id="noDataMsg" class="hidden msg" style="text-align: center; color: #888; padding: 4rem 0; font-size: 1.1rem; font-weight: 500;">
+          No hay pedidos registrados que coincidan con los filtros seleccionados.
+        </p>
+
+        <!-- Contenedores de gráficos -->
+        <div id="charts-wrapper">
+          <div id="products-tab" class="chart-tab-content">
+            <div class="chart-card">
+              <canvas id="topProductsChart"></canvas>
+            </div>
+          </div>
+          <div id="month-tab" class="chart-tab-content hidden">
+            <div class="chart-card">
+              <canvas id="salesMonthChart"></canvas>
+            </div>
+          </div>
+          <div id="zone-tab" class="chart-tab-content hidden">
+            <div class="chart-card" style="max-width: 480px; margin: 0 auto;">
+              <canvas id="salesZoneChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conclusiones Automáticas -->
+        <div class="chart-card" style="margin-top: 2rem; padding: 1.8rem; border: 1px dashed rgba(56,189,248,0.2); background: rgba(56,189,248,0.02);">
+          <h4 style="margin-bottom: 1.2rem; color: #38bdf8; font-size: 1.1rem;">📝 Conclusiones Automáticas de Negocio</h4>
+          <ul id="conclusions-list" style="list-style: none; display: flex; flex-direction: column; gap: 0.8rem; font-size: 0.9rem; color: #cbd5e1;">
+            <!-- Generadas dinámicamente -->
+          </ul>
+        </div>
+
+        <!-- Reportes (Descargas) -->
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+          <button id="exportCsvBtn" style="flex: 1; font-size: 0.9rem; background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.25);">📊 Descargar Reporte (Excel)</button>
+          <button id="exportPdfBtn" class="logout" style="flex: 1; font-size: 0.9rem; margin: 0; padding: 0.95rem;">🖨️ Imprimir / Exportar PDF</button>
         </div>
       </div>
     </section>

@@ -32,21 +32,41 @@ class Pedido(db.Model):
     cantidad = db.Column(db.Integer, nullable=False)
     precio_uni = db.Column(db.Float, nullable=False)
     total = db.Column(db.Float, nullable=False)
+    vendedor_username = db.Column(db.String(80), nullable=True) # Atribución de venta
+
+class LogSesion(db.Model):
+    __tablename__ = 'logs_sesion'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), nullable=False)
+    role = db.Column(db.String(20), nullable=False)
+    fecha_hora = db.Column(db.String(30), nullable=False) # Formato YYYY-MM-DD HH:MM:SS
+    ip_address = db.Column(db.String(50), nullable=False)
 
 # Inicializar Base de Datos al arrancar la aplicación
 with app.app_context():
     recreate_db = False
     try:
-        # Usar el inspector de SQLAlchemy para comprobar si la tabla 'usuarios' tiene el tamaño de contraseña viejo
         from sqlalchemy import inspect
         inspector = inspect(db.engine)
-        if 'usuarios' in inspector.get_table_names():
-            columns = inspector.get_columns('usuarios')
-            pwd_col = next((c for c in columns if c['name'] == 'password_hash'), None)
+        tables = inspector.get_table_names()
+        
+        # Comprobar si existen todas las tablas necesarias
+        if 'usuarios' in tables and 'pedidos' in tables and 'logs_sesion' in tables:
+            # Validar tamaño del hash de contraseñas
+            user_cols = inspector.get_columns('usuarios')
+            pwd_col = next((c for c in user_cols if c['name'] == 'password_hash'), None)
             if pwd_col and getattr(pwd_col['type'], 'length', None) != 256:
                 recreate_db = True
                 
-        # Verificar también si la columna 'status' existe
+            # Validar columna de atribución en pedidos
+            pedidos_cols = inspector.get_columns('pedidos')
+            vend_col = next((c for c in pedidos_cols if c['name'] == 'vendedor_username'), None)
+            if not vend_col:
+                recreate_db = True
+        else:
+            recreate_db = True
+            
+        # Comprobación básica de consulta
         if not recreate_db:
             db.session.query(Usuario.status).first()
     except Exception as e:
@@ -85,9 +105,25 @@ def login():
     data = request.json
     user = Usuario.query.filter_by(username=data['username']).first()
     if user and check_password_hash(user.password_hash, data['password']):
-        # Control de seguridad: Verificar si la cuenta ha sido aprobada por el admin
         if user.status != 'active':
             return jsonify({'status': 'error', 'msg': 'Tu cuenta está pendiente de aprobación por el administrador.'}), 403
+            
+        # Guardar log de inicio de sesión exitoso
+        ahora = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ip = request.remote_addr or '127.0.0.1'
+        # Si se corre detrás de un proxy (como Render), obtener la IP del cliente real
+        if request.headers.get('X-Forwarded-For'):
+            ip = request.headers.get('X-Forwarded-For').split(',')[0].strip()
+            
+        log = LogSesion(
+            username=user.username,
+            role=user.role,
+            fecha_hora=ahora,
+            ip_address=ip
+        )
+        db.session.add(log)
+        db.session.commit()
+        
         return jsonify({'status': 'ok', 'role': user.role}), 200
     return jsonify({'status': 'error', 'msg': 'Usuario o contraseña incorrectos'}), 401
 
@@ -143,6 +179,46 @@ def admin_create_user():
     db.session.commit()
     return jsonify({'status': 'ok'}), 201
 
+@app.route('/api/users/<int:user_id>', methods=['PUT'])
+def edit_user(user_id):
+    if not check_role(['admin']):
+        return jsonify({'status': 'error', 'msg': 'Acceso denegado'}), 403
+    data = request.json
+    user = db.session.get(Usuario, user_id)
+    if not user:
+        return jsonify({'status': 'error', 'msg': 'Usuario no encontrado'}), 404
+    if user.username == 'admin':
+        return jsonify({'status': 'error', 'msg': 'No se puede modificar la cuenta del administrador principal'}), 400
+        
+    new_username = data.get('username')
+    if new_username and new_username != user.username:
+        if Usuario.query.filter_by(username=new_username).first():
+            return jsonify({'status': 'error', 'msg': 'El nombre de usuario ya está tomado'}), 400
+        user.username = new_username
+        
+    if 'role' in data:
+        user.role = data['role']
+        
+    if 'password' in data and data['password'].strip() != '':
+        user.password_hash = generate_password_hash(data['password'])
+        
+    db.session.commit()
+    return jsonify({'status': 'ok'}), 200
+
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    if not check_role(['admin']):
+        return jsonify({'status': 'error', 'msg': 'Acceso denegado'}), 403
+    user = db.session.get(Usuario, user_id)
+    if not user:
+        return jsonify({'status': 'error', 'msg': 'Usuario no encontrado'}), 404
+    if user.username == 'admin':
+        return jsonify({'status': 'error', 'msg': 'No se puede eliminar el administrador principal'}), 400
+        
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'status': 'ok'}), 200
+
 @app.route('/api/users/<int:user_id>/status', methods=['PUT'])
 def update_user_status(user_id):
     if not check_role(['admin']):
@@ -158,6 +234,22 @@ def update_user_status(user_id):
     db.session.commit()
     return jsonify({'status': 'ok'}), 200
 
+# ==================== ENDPOINT DE LOGS DE SESIÓN (AUDITORÍA) ====================
+
+@app.route('/api/login_logs', methods=['GET'])
+def get_login_logs():
+    if not check_role(['admin']):
+        return jsonify({'status': 'error', 'msg': 'Acceso denegado'}), 403
+    logs = LogSesion.query.order_by(LogSesion.id.desc()).limit(20).all()
+    resultado = [{
+        'id': l.id,
+        'username': l.username,
+        'role': l.role,
+        'fecha_hora': l.fecha_hora,
+        'ip_address': l.ip_address
+    } for l in logs]
+    return jsonify(resultado)
+
 # ==================== ENDPOINTS DE PEDIDOS ====================
 
 @app.route('/api/orders', methods=['GET'])
@@ -165,15 +257,16 @@ def get_orders():
     if not check_role(['vendedor', 'analista', 'admin']):
         return jsonify({'status': 'error', 'msg': 'Acceso denegado'}), 403
     
-    pedidos = Pedido.query.order_by(Pedido.id.desc()).limit(15).all()
+    pedidos = Pedido.query.order_by(Pedido.id.desc()).all() # Cargar todos los pedidos para filtros en el cliente
     resultado = [{
-        'id': p.id, # Retorna el ID para permitir edición
+        'id': p.id,
         'fecha': p.fecha,
         'producto': p.producto,
         'zona': p.zona,
         'cantidad': p.cantidad,
         'precio_uni': p.precio_uni,
-        'total': p.total
+        'total': p.total,
+        'vendedor': p.vendedor_username or 'vendedor1'
     } for p in pedidos]
     return jsonify(resultado)
 
@@ -187,6 +280,8 @@ def add_order():
     if not all(k in data for k in required):
         return jsonify({'status': 'error', 'msg': 'Faltan campos requeridos'}), 400
         
+    vendedor = request.headers.get('X-User-Username', 'vendedor1')
+        
     try:
         total = round(int(data['cantidad']) * float(data['precio_uni']), 2)
         nuevo_pedido = Pedido(
@@ -195,7 +290,8 @@ def add_order():
             zona=data['zona'],
             cantidad=int(data['cantidad']),
             precio_uni=float(data['precio_uni']),
-            total=total
+            total=total,
+            vendedor_username=vendedor
         )
         db.session.add(nuevo_pedido)
         db.session.commit()
